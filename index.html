@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz Modular</title>
+<style>
+* {margin:0;padding:0;box-sizing:border-box;}
+html, body {width:100%;height:100%;font-family:Arial,sans-serif;overflow:hidden;}
+
+#overlay {
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.85);color:white;
+  display:flex;justify-content:center;align-items:center;
+  text-align:center;font-size:24px;padding:20px;
+  z-index:9999;
+}
+#overlay.hidden {display:none;}
+
+.screen {
+  display:flex;flex-direction:column;justify-content:center;
+  align-items:center;width:100%;height:100%;text-align:center;
+  background-color:#2031ED;color:white;font-size:24px;
+  position:absolute;top:0;left:0;
+}
+.screen:not(.visible) {display:none;}
+
+/* Botões do quiz (2x2 grid) */
+#quizContent .menu-btn {
+  width: 100%;
+  padding: 20px 0;
+  font-size: 22px;
+  background-color:#FFD700;
+  color:#2031ED;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+  transition: transform 0.1s ease;
+}
+#quizContent .menu-btn:hover { transform: scale(1.05); }
+#quizContent .menu-btn:active { transform: scale(0.95); }
+
+.menu-btn.menu {
+  width: 200px;
+  margin: 10px 0;
+  font-size: 20px;
+  padding: 15px 0;
+  background-color:#FFD700;
+  color:#2031ED;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+  transition: transform 0.1s ease;
+}
+.menu-btn.menu:hover { transform: scale(1.05); }
+.menu-btn.menu:active { transform: scale(0.95); }
+
+#fullscreenBtn {margin-top:20px;cursor:pointer;width:80px;height:80px;}
+
+.modal {display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.8);justify-content:center;align-items:center;color:white;z-index:10000;}
+.modal-content {background:#2031ED;padding:20px;border-radius:10px;text-align:center;max-width:90%;}
+.close-btn {margin-top:15px;padding:10px 20px;font-size:18px;cursor:pointer;
+  border:none;border-radius:8px;background:#FFD700;color:#2031ED;
+  transition: transform 0.1s ease;}
+.close-btn:hover { transform: scale(1.05); }
+.close-btn:active { transform: scale(0.95); }
+
+#options {display:grid;grid-template-columns:1fr 1fr;gap:25px 25px;margin-top:50px;width:80%;}
+#questionClick {cursor:pointer;text-decoration:underline;color:#FFD700;}
+</style>
+</head>
+<body>
+
+<!-- Sons -->
+<audio id="bgMusic" src="bg-music.mp3" loop></audio>
+<audio id="clickSound" src="click.mp3"></audio>
+<audio id="loseSound" src="lose.mp3"></audio>
+<audio id="winSound" src="win.mp3"></audio>
+
+<div id="overlay">Por favor, gire seu dispositivo para modo horizontal!</div>
+
+<!-- Menu -->
+<div class="screen visible" id="mainContent">
+  <h1>Bem-vindo ao Quiz</h1>
+  <p>Modo horizontal ativo.</p>
+  <button class="menu-btn menu" id="playBtn">Jogar</button>
+  <button class="menu-btn menu" id="creditsBtn">Créditos</button>
+  <button class="menu-btn menu" id="soundBtn">Som: ON</button>
+  <img id="fullscreenBtn" src="fullscreen-icon.png" alt="Ativar Fullscreen">
+</div>
+
+<!-- Quiz -->
+<div class="screen" id="quizContent">
+  <h2 id="questionTitle"></h2>
+  <div id="options"></div>
+</div>
+
+<!-- Tela de derrota -->
+<div class="screen" id="lostContent">
+  <h2>Você errou! 😢</h2>
+  <p>Não se preocupe, tente novamente.</p>
+  <button class="menu-btn menu" id="retryBtn">Recomeçar</button>
+</div>
+
+<!-- Tela de vitória -->
+<div class="screen" id="winContent">
+  <h2>Parabéns! 🎉</h2>
+  <p>Você completou todas as perguntas!</p>
+  <button class="menu-btn menu" id="restartBtn">Jogar Novamente</button>
+</div>
+
+<!-- Modal Créditos -->
+<div class="modal" id="creditsModal">
+  <div class="modal-content">
+    <h2>Créditos do Quiz</h2>
+    <p>Desenvolvedor: Você</p>
+    <button class="close-btn" onclick="closeModal('creditsModal')">Fechar</button>
+  </div>
+</div>
+
+<script>
+/********** VARIÁVEIS GLOBAIS **********/
+const screens = {
+    main: document.getElementById('mainContent'),
+    quiz: document.getElementById('quizContent'),
+    lost: document.getElementById('lostContent'),
+    win: document.getElementById('winContent')
+};
+const questionTitle = document.getElementById('questionTitle');
+const optionsDiv = document.getElementById('options');
+const overlay = document.getElementById('overlay');
+
+const bgMusic = document.getElementById('bgMusic');
+const clickSound = document.getElementById('clickSound');
+const loseSound = document.getElementById('loseSound');
+const winSound = document.getElementById('winSound');
+
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const soundBtn = document.getElementById('soundBtn');
+
+let soundOn = true;
+let fullscreenActivated = false;
+let currentQuestion = 0;
+
+/********** DADOS DO QUIZ **********/
+const quizData = [
+    {q:"Qual é a capital do Brasil?", options:["Brasília","São Paulo","Rio de Janeiro","Curitiba"], answer:0},
+    {q:"Qual planeta é conhecido como Planeta Vermelho?", options:["Marte","Júpiter","Vênus","Mercúrio"], answer:0},
+    {q:"Qual é a linguagem usada para web?", options:["Python","JavaScript","C++","Java"], answer:1},
+    {q:"Qual é o maior oceano do mundo?", options:["Atlântico","Pacífico","Índico","Ártico"], answer:1},
+    {q:"Qual é o maior animal terrestre?", options:["Elefante","Girafa","Hipopótamo","Rinoceronte"], answer:0},
+    {q:"Qual é a moeda do Japão?", options:["Yen","Dólar","Euro","Libra"], answer:0},
+    {q:"Quantos continentes existem?", options:["5","6","7","8"], answer:2},
+    {q:'Pergunta "8": isdjfjdjdjdjdjemsmxkd?', options:["Alternativa 1","Alternativa 2","Alternativa 3","Alternativa 4"], answer:"special"}
+];
+
+/********** FUNÇÕES DE SOM **********/
+function playClick(){ if(soundOn) clickSound.currentTime=0, clickSound.play(); }
+function playLose(){ if(soundOn) loseSound.currentTime=0, loseSound.play(); }
+function playWin(){ if(soundOn) winSound.currentTime=0, winSound.play(); }
+function playBg(){ if(soundOn) bgMusic.play(); else bgMusic.pause(); }
+
+/********** SCREEN MANAGEMENT **********/
+function showScreen(screenName){
+    for(let key in screens) screens[key].classList.remove('visible');
+    screens[screenName].classList.add('visible');
+}
+
+/********** FULLSCREEN **********/
+function goFullscreen(el){
+    if(el.requestFullscreen) el.requestFullscreen();
+    else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    else if(el.msRequestFullscreen) el.msRequestFullscreen();
+    fullscreenActivated = true;
+}
+
+/********** ORIENTATION CHECK (corrigido) **********/
+function checkOrientation(){
+    if(window.innerHeight > window.innerWidth){
+        overlay.classList.remove('hidden');
+        for(let key in screens) screens[key].classList.remove('visible');
+    } else {
+        overlay.classList.add('hidden');
+        if(currentQuestion > 0 && currentQuestion < quizData.length){
+            showScreen('quiz');
+        } else if(currentQuestion >= quizData.length){
+            showScreen('win');
+        } else {
+            showScreen('main');
+        }
+    }
+}
+window.addEventListener('resize', checkOrientation);
+window.addEventListener('orientationchange', checkOrientation);
+checkOrientation();
+
+/********** MODAL **********/
+function openModal(id){ document.getElementById(id).style.display='flex'; playClick(); }
+function closeModal(id){ document.getElementById(id).style.display='none'; playClick(); }
+
+/********** QUIZ FUNCTIONS **********/
+function initQuiz(){
+    currentQuestion = 0;
+    showQuestion();
+    playBg();
+    showScreen('quiz');
+}
+
+function createButton(text, onClick){
+    const btn = document.createElement('button');
+    btn.textContent = text;
+    btn.className = 'menu-btn';
+    btn.onclick = ()=>{playClick(); onClick();}
+    return btn;
+}
+
+function showQuestion(){
+    const q = quizData[currentQuestion];
+    optionsDiv.innerHTML = "";
+
+    if(q.answer === "special"){
+        questionTitle.innerHTML = `<span id="questionClick">${q.q}</span>`;
+        document.getElementById("questionClick").onclick = ()=>{
+            currentQuestion++;
+            if(currentQuestion >= quizData.length) { showScreen('win'); playWin(); }
+            else showQuestion();
+        };
+        q.options.forEach((opt)=>{
+            optionsDiv.appendChild(createButton(opt, ()=>goToLostScreen()));
+        });
+
+    } else {
+        questionTitle.textContent = `Pergunta ${currentQuestion+1}: ${q.q}`;
+        for(let i=0;i<4;i++){
+            const optText = q.options[i] ? q.options[i] : "Opcional";
+            optionsDiv.appendChild(createButton(optText, ()=>checkAnswer(i)));
+        }
+    }
+}
+
+function checkAnswer(selected){
+    const q = quizData[currentQuestion];
+    if(selected === q.answer){
+        currentQuestion++;
+        if(currentQuestion >= quizData.length) { showScreen('win'); playWin(); }
+        else showQuestion();
+    } else goToLostScreen();
+}
+
+function goToLostScreen(){ showScreen('lost'); playLose(); }
+
+/********** EVENTOS MENU **********/
+document.getElementById('playBtn').onclick = ()=>initQuiz();
+document.getElementById('retryBtn').onclick = ()=>initQuiz();
+document.getElementById('restartBtn').onclick = ()=>showScreen('main');
+document.getElementById('creditsBtn').onclick = ()=>openModal('creditsModal');
+
+fullscreenBtn.onclick = ()=>goFullscreen(document.documentElement);
+soundBtn.onclick = ()=>{
+    soundOn = !soundOn;
+    soundBtn.textContent = `Som: ${soundOn?'ON':'OFF'}`;
+    if(soundOn) playBg(); else bgMusic.pause();
+}
+
+/********** INICIAR **********/
+playBg();
+</script>
+
+</body>
+</html>

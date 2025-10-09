@@ -1,126 +1,277 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Login com Google - Professor Webson</title>
-  <style>
-    body {
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: linear-gradient(135deg, #2563eb, #60a5fa);
-      font-family: Arial, sans-serif;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crazy Quiz</title>
+<style>
+* {margin:0;padding:0;box-sizing:border-box;}
+html, body {width:100%;height:100%;font-family:Arial,sans-serif;overflow:hidden;}
+#overlay {
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.9);color:white;
+  display:flex;justify-content:center;align-items:center;
+  text-align:center;font-size:24px;padding:20px;
+  z-index:10000;
+}
+#overlay.hidden {display:none;}
 
-    .login-box {
-      background: white;
-      padding: 30px;
-      border-radius: 15px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-      text-align: center;
-      width: 320px;
-    }
+/* Telas */
+.screen {
+  display:flex;flex-direction:column;justify-content:center;
+  align-items:center;width:100%;height:100%;text-align:center;
+  background-color:#2031ED;color:white;font-size:24px;
+  position:absolute;top:0;left:0;
+}
+.screen:not(.visible) {display:none;}
 
-    h2 {
-      color: #2563eb;
-      margin-bottom: 20px;
-    }
+/* Botões */
+button, .menu-btn {
+  cursor:pointer;transition: transform 0.1s ease;
+  color: white !important;
+  font-weight:bold;
+}
+button:hover, .menu-btn:hover {transform: scale(1.05);}
+button:active, .menu-btn:active {transform: scale(0.95);}
 
-    button {
-      background: #2563eb;
-      color: white;
-      border: none;
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      width: 100%;
-    }
+.menu-btn.menu {
+  width:200px;font-size:20px;padding:15px 0;
+  background:#FFD700;border:none;border-radius:10px;margin:10px 0;
+}
 
-    button:hover {
-      background: #1e3a8a;
-    }
+#quizContent .menu-btn {
+  width:100%;padding:20px 0;font-size:22px;
+  background:#FFD700;border:none;border-radius:10px;margin:5px 0;
+}
 
-    img {
-      border-radius: 50%;
-      margin-top: 10px;
-    }
-  </style>
+/* Modal */
+.modal {
+  display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.8);justify-content:center;align-items:center;
+  color:white;z-index:10001;
+}
+.modal-content {
+  background:#2031ED;padding:20px;border-radius:10px;text-align:center;max-width:90%;
+}
+.close-btn {
+  margin-top:15px;padding:10px 20px;font-size:18px;
+  border:none;border-radius:8px;background:#FFD700;color:white !important;
+}
+
+/* Quiz layout */
+#options {display:grid;grid-template-columns:1fr 1fr;gap:25px;margin-top:50px;width:80%;}
+
+/* Botões fixos sempre visíveis */
+#soundBtn, #fullscreenBtn, #exitBtn {
+  position:fixed;
+  background:#FFD700;color:white !important;
+  border:none;border-radius:12px;
+  font-weight:bold;z-index:9999;
+  transition:transform 0.2s ease, background 0.2s ease;
+}
+#soundBtn {top:15px;right:15px;padding:12px 20px;font-size:16px;}
+#fullscreenBtn {bottom:15px;right:15px;width:65px;height:65px;font-size:22px;border-radius:50%;}
+#exitBtn {top:15px;left:15px;padding:12px 20px;font-size:16px;display:none;}
+#soundBtn:hover, #fullscreenBtn:hover, #exitBtn:hover {transform:scale(1.1);}
+#soundBtn:active, #fullscreenBtn:active, #exitBtn:active {transform:scale(0.95);}
+
+/* Bloqueio global de clique */
+body * {pointer-events:none !important;}
+.clicavel {pointer-events:auto !important;}
+</style>
 </head>
 <body>
-  <div class="login-box">
-    <h2>Entrar com Google</h2>
-    <button id="btnGoogle">Continuar com Google</button>
-    <p id="status"></p>
+
+<!-- Som de clique -->
+<audio id="clickSound" src="click.mp3"></audio>
+
+<div id="overlay">Por favor, gire seu dispositivo para modo horizontal!</div>
+
+<!-- Botões fixos -->
+<button id="soundBtn" class="clicavel">Som: OFF</button>
+<button id="fullscreenBtn" class="clicavel">⛶</button>
+<button id="exitBtn" class="clicavel">Sair</button>
+
+<!-- Menu -->
+<div class="screen visible" id="mainContent">
+  <h1>Crazy Quiz</h1>
+  <br>
+  <button class="menu-btn menu clicavel" id="playBtn">Jogar</button>
+  <button class="menu-btn menu clicavel" id="creditsBtn">Créditos</button>
+</div>
+
+<!-- Quiz -->
+<div class="screen" id="quizContent">
+  <h2 id="questionTitle"></h2>
+  <div id="options"></div>
+</div>
+
+<!-- Derrota -->
+<div class="screen" id="lostContent">
+  <h2>Você errou! 😢</h2>
+  <p>Tente novamente!</p>
+  <button class="menu-btn menu clicavel" id="retryBtn">Recomeçar</button>
+</div>
+
+<!-- Vitória -->
+<div class="screen" id="winContent">
+  <h2>Parabéns! 🎉</h2>
+  <p>Você completou todas as perguntas!</p>
+  <button class="menu-btn menu clicavel" id="restartBtn">Jogar Novamente</button>
+</div>
+
+<!-- Modal Créditos -->
+<div class="modal" id="creditsModal">
+  <div class="modal-content">
+    <h2>Créditos</h2>
+    <p>Desenvolvido por Anônimo Mods, inscreva-se no canal para mais novidades! </p>
+    <div style="display:flex;justify-content:center;gap:10px;margin-top:15px;">
+      <button class="close-btn clicavel" onclick="closeModal('creditsModal')">Fechar</button>
+      <button class="close-btn clicavel" onclick="openYT()" style="background:#FF0000;">YouTube</button>
+    </div>
   </div>
+</div>
 
-  <!-- Firebase: Importar módulos modernos -->
-  <script type="module">
-    // 1️⃣ Importar módulos necessários
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } 
-      from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+<script>
+/********** VARIÁVEIS **********/
+const screens = {
+  main: document.getElementById('mainContent'),
+  quiz: document.getElementById('quizContent'),
+  lost: document.getElementById('lostContent'),
+  win: document.getElementById('winContent')
+};
+const questionTitle = document.getElementById('questionTitle');
+const optionsDiv = document.getElementById('options');
+const overlay = document.getElementById('overlay');
 
-    // 2️⃣ Sua configuração (a que você copiou do console)
-    const firebaseConfig = {
-      apiKey: "AIzaSyBQvP1kATuHZcTKl5OSlqNcnGx3yjm4KHs",
-      authDomain: "spck1-c808b.firebaseapp.com",
-      projectId: "spck1-c808b",
-      storageBucket: "spck1-c808b.firebasestorage.app",
-      messagingSenderId: "718248187313",
-      appId: "1:718248187313:web:b20cfbb120231135749990",
-      measurementId: "G-D0E6KJ1XPQ"
-    };
+const clickSound = document.getElementById('clickSound');
+const soundBtn = document.getElementById('soundBtn');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const exitBtn = document.getElementById('exitBtn');
 
-    // 3️⃣ Inicializar Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
+let soundOn = false; // Inicia OFF
+let currentQuestion = 0;
 
-    // 4️⃣ Selecionar elementos HTML
-    const btnGoogle = document.getElementById('btnGoogle');
-    const status = document.getElementById('status');
+const quizData = [
+  {q:"Qual é a capital do Brasil?", options:["Brasília","São Paulo","Rio de Janeiro","Curitiba"], answer:0},
+  {q:"Qual é o maior oceano do mundo?", options:["Atlântico","Pacífico","Índico","Ártico"], answer:1},
+  {q:"Qual é a moeda do Japão?", options:["Yen","Dólar","Euro","Libra"], answer:0},
+  {q:"Qual é o rio mais longo do mundo?", options:["Nilo","Amazônia","Yangtzé","Mississippi"], answer:1},
+  {q:"Qual é a montanha mais alta do mundo?", options:["Everest","K2","Kangchenjunga","Lhotse"], answer:0},
+  {q:"Quem pintou a Mona Lisa?", options:["Van Gogh","Leonardo da Vinci","Pablo Picasso","Michelangelo"], answer:1},
+  {q:"Qual é o elemento químico com símbolo 'O'?", options:["Ouro","Oxigênio","Osmium","Ônix"], answer:1},
+  {q:"Quem escreveu 'Dom Casmurro'?", options:["Machado de Assis","José de Alencar","Clarice Lispector","Graciliano Ramos"], answer:0},
+  {q:"Qual é a capital da França?", options:["Paris","Lyon","Marselha","Nice"], answer:0},
+  {q:"Qual é o planeta mais próximo do Sol?", options:["Vênus","Mercúrio","Marte","Terra"], answer:1}
+];
 
-    // 5️⃣ Função de login com Google
-    btnGoogle.addEventListener('click', async () => {
-      try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        status.innerHTML = `
-          <strong>Bem-vindo, ${user.displayName}!</strong><br>
-          <img src="${user.photoURL}" width="70">
-          <br><button id="logout">Sair</button>
-        `;
-        addLogoutListener(); // adiciona evento ao botão de sair
-      } catch (error) {
-        alert("Erro ao fazer login: " + error.message);
-      }
-    });
+/********** SOM **********/
+function playClick(){ if(soundOn){ clickSound.currentTime=0; clickSound.play(); } }
 
-    // 6️⃣ Função para sair
-    function addLogoutListener() {
-      const logoutBtn = document.getElementById('logout');
-      logoutBtn.addEventListener('click', async () => {
-        await signOut(auth);
-        status.innerHTML = "Você saiu da conta. 👋";
-      });
+/********** BLOQUEIO **********/
+function bloquearTudo(){ document.querySelectorAll('*').forEach(el=>el.classList.remove('clicavel')); }
+function liberarElementos(seletores){ seletores.forEach(sel=>document.querySelectorAll(sel).forEach(el=>el.classList.add('clicavel'))); }
+function atualizarCliquesAtivos(){
+  bloquearTudo();
+  liberarElementos([
+    '#playBtn','#creditsBtn','#soundBtn','#fullscreenBtn',
+    '#retryBtn','#restartBtn','#questionClick','#options button',
+    '.close-btn'
+  ]);
+  if(screens.quiz.classList.contains('visible')){
+    exitBtn.style.display = 'block';
+    exitBtn.classList.add('clicavel');
+  } else { exitBtn.style.display = 'none'; }
+}
+
+/********** TELAS **********/
+function showScreen(name){
+  for(let k in screens) screens[k].classList.remove('visible');
+  screens[name].classList.add('visible');
+  atualizarCliquesAtivos();
+}
+
+/********** FULLSCREEN TOGGLE **********/
+fullscreenBtn.onclick = () => {
+    playClick();
+    if (!document.fullscreenElement) {
+        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+        else if (document.documentElement.webkitRequestFullscreen) document.documentElement.webkitRequestFullscreen();
+    } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
     }
+};
 
-    // 7️⃣ Detectar se já está logado
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        status.innerHTML = `
-          <strong>Bem-vindo, ${user.displayName}!</strong><br>
-          <img src="${user.photoURL}" width="70">
-          <br><button id="logout">Sair</button>
-        `;
-        addLogoutListener();
-      } else {
-        status.innerHTML = "";
-      }
-    });
-  </script>
+/********** ORIENTAÇÃO CORRIGIDA **********/
+function checkOrientation(){
+    const isPortrait = window.innerHeight > window.innerWidth;
+    if(isPortrait){
+        overlay.classList.remove('hidden');
+    } else {
+        overlay.classList.add('hidden');
+        if(screens.quiz.classList.contains('visible')) showScreen('quiz');
+        else if(screens.win.classList.contains('visible')) showScreen('win');
+        else if(screens.lost.classList.contains('visible')) showScreen('lost');
+        else showScreen('main');
+    }
+}
+window.addEventListener('resize', checkOrientation);
+window.addEventListener('orientationchange', checkOrientation);
+checkOrientation();
+
+/********** MODAL **********/
+function openModal(id){ document.getElementById(id).style.display='flex'; playClick(); atualizarCliquesAtivos(); }
+function closeModal(id){ document.getElementById(id).style.display='none'; playClick(); atualizarCliquesAtivos(); }
+
+/********** ABRIR YOUTUBE **********/
+function openYT() {
+    playClick();
+    window.open('https://www.youtube.com/@An%C3%B4nimoMods01', '_blank');
+}
+
+/********** QUIZ **********/
+function initQuiz(){ currentQuestion=0; showQuestion(); showScreen('quiz'); }
+function createButton(text,onClick){
+  const btn=document.createElement('button');
+  btn.textContent=text; btn.className='menu-btn clicavel';
+  btn.onclick=()=>{playClick();onClick();};
+  return btn;
+}
+function showQuestion(){
+  const q=quizData[currentQuestion];
+  optionsDiv.innerHTML="";
+  questionTitle.textContent=`Pergunta ${currentQuestion+1}: ${q.q}`;
+  for(let i=0;i<4;i++)
+    optionsDiv.appendChild(createButton(q.options[i]||"Opcional",()=>checkAnswer(i)));
+  atualizarCliquesAtivos();
+}
+function checkAnswer(selected){
+  const q = quizData[currentQuestion];
+  selected===q.answer?(currentQuestion++,currentQuestion>=quizData.length?showScreen('win'):showQuestion()):goToLostScreen();
+}
+function goToLostScreen(){ showScreen('lost'); }
+
+/********** EVENTOS **********/
+document.getElementById('playBtn').onclick = () => { playClick(); initQuiz(); }
+document.getElementById('creditsBtn').onclick = () => openModal('creditsModal');
+document.getElementById('retryBtn').onclick = () => { playClick(); initQuiz(); }
+document.getElementById('restartBtn').onclick = () => { playClick(); showScreen('main'); }
+
+// Botão de som inicia OFF e funciona corretamente
+soundBtn.textContent = `Som: ${soundOn ? 'ON' : 'OFF'}`;
+soundBtn.onclick = () => {
+    soundOn = !soundOn;                   // alterna estado do som
+    playClick();                           // toca clique se agora estiver ON
+    soundBtn.textContent = `Som: ${soundOn ? 'ON' : 'OFF'}`; // atualiza texto
+}
+
+// Botão de sair durante o quiz
+exitBtn.onclick = () => { playClick(); showScreen('main'); }
+
+/********** INICIALIZAÇÃO **********/
+atualizarCliquesAtivos();
+</script>
+
 </body>
-</html>
+</html> 
